@@ -193,26 +193,26 @@ SLA Breaches Today: 3 | Top 5 Action Leads (Call NOW)
 ## 📸 Screenshots – Day 11
 
 ### 1. Architecture Day 11 – FREE Stack No Proxycurl – 12 Steps Horizontal + Dubai Map (Main)
-[Architecture Light](screenshots/v-architecture-light.jpg)
-[Architecture Dark](screenshots/v-architecture-dark.jpg)
+![Architecture Light](screenshots/v-architecture-light.jpg)
+![Architecture Dark](screenshots/v-architecture-dark.jpg)
 
 ### 2. IntakeAPI – Webhook Intake → Normalize → Supabase Insert → Trigger FREE → Respond 1.701s
-[IntakeAPI](screenshots/intakeapi-1.7s.jpg)
+![IntakeAPI](screenshots/intakeapi-1.7s.jpg)
 
 ### 3. FREE Scoring – Webhook FREE → Get Lead By ID1 1 row → Regex 95 Hot → Upsert 2219e410 3.603s
-[FREE Scoring](screenshots/free-scoring-95-hot.jpg)
+![FREE Scoring](screenshots/free-scoring-95-hot.jpg)
 
 ### 4. Finance RAG – Code Chunk 2k 7 chunks → Embedding 768d → HTTP JSON.stringify fix → 7 rows
-[Finance RAG](screenshots/finance-7-chunks.jpg)
+![Finance RAG](screenshots/finance-7-chunks.jpg)
 
 ### 5. DailyOpsDigest – Cron 09:10 Dubai → Top5 5 items → Build HTML SAFE getJsons() → Gmail ta172592d2eb3ca5
-[DailyOpsDigest](screenshots/digest-5-hot.jpg)
+![DailyOpsDigest](screenshots/digest-5-hot.jpg)
 
 ### 6. Gmail Proof – 5 Hot Leads to Call Today – 23/10/2026
-[Gmail](screenshots/gmail-proof.png)
+![Gmail](screenshots/gmail-proof.png)
 
 ### 7. SLA Monitor – Cron 1 Min → Get Breached 0 rows → False Branch healthy → 0 spam + Idempotency proof
-[SLA Monitor](screenshots/sla-idempotency.jpg)
+![SLA Monitor](screenshots/sla-idempotency.jpg)
 
 ---
 
@@ -231,7 +231,7 @@ SLA Breaches Today: 3 | Top 5 Action Leads (Call NOW)
 
 ## 👨💻 Author
 
-**ToqeerAhmad** – Dubai, UAE 🇦🇪
+**Toqeer Ahmad** – Dubai, UAE 🇦🇪
 
 AI Automation • Enterprise RAG • WhatsApp Bots • Lead Automation • n8n • Gemini 3.5 Flash Lite • Supabase pgvector • Qdrant • Arabic + Dubai dialect
 
