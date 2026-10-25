@@ -1,0 +1,243 @@
+{
+  "name": "Day11-05 Formula Score",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "93489ffd-52f5-4cda-ba24-055e0b967113",
+      "name": "Schedule Every 10m"
+    },
+    {
+      "parameters": {
+        "url": "https://pnafbhfijmaaxsertzof.supabase.co/rest/v1/v_leads_for_formula?select=*",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "id": "0ee3df55-ee08-4d1b-8774-f98ac470039b",
+      "name": "Supabase Get Leads for Formula",
+      "credentials": {
+        "supabaseApi": {
+          "id": "uwAmK3QR0J2Wd1go",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return {\n  json: {\n    lead_id: $input.item.json.lead_id,\n    query_text: `${$input.item.json.intent} ${$input.item.json.location} budget ${$input.item.json.budget_max} ${$input.item.json.last_message}`.slice(0,2000),\n    current_score: $input.item.json.current_score || 50\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "a6dc7887-d134-4be0-9993-2bba2d5667f6",
+      "name": "Code Build Query"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: { parts: [{ text: $json.query_text }] }, outputDimensionality: 768, model: \"models/gemini-embedding-001\" }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        672,
+        0
+      ],
+      "id": "1a488311-f005-43fe-8ff9-d17f3c866b2e",
+      "name": "Gemini Embedding",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "24HMO98yb3N7ucpr",
+          "name": "Gemini Toqeer Prod"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://pnafbhfijmaaxsertzof.supabase.co/rest/v1/rpc/match_finance_docs",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query_embedding: $json.embedding.values, match_threshold: 0.5, match_count: 1 }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        896,
+        0
+      ],
+      "id": "8293a002-b848-4db5-9f3c-d3d0089257e2",
+      "name": "Supabase Match RAG",
+      "credentials": {
+        "supabaseApi": {
+          "id": "uwAmK3QR0J2Wd1go",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const lead = $('Code Build Query').item.json;\nconst rag = $input.item.json;\nconst relevance = lead.current_score || 50;\nconst confidence = Math.round((rag.similarity || 0.75) * 100);\nconst finalScore = Math.round(relevance*0.6 + confidence*0.4);\nlet band = finalScore >= 80 ? 'Hot' : finalScore >= 50 ? 'Warm' : 'Cold';\nreturn {\n  json: {\n    lead_id: lead.lead_id,\n    score: finalScore,\n    band: band,\n    reason: `Formula: ${relevance}*0.6 + ${confidence}*0.4 | RAG ${rag.filename} sim ${confidence}`,\n    model: 'formula-rag-v1'\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "04617c0d-e8c6-4d0d-bae7-8170832e32ef",
+      "name": "Code Formula"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://pnafbhfijmaaxsertzof.supabase.co/rest/v1/lead_scores?on_conflict=lead_id",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "return=representation,resolution=merge-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ lead_id: $json.lead_id, score: $json.score, band: $json.band, reason: $json.reason, model: $json.model }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1344,
+        0
+      ],
+      "id": "779ab0e5-4a43-4aae-afe4-7fb20c483ce4",
+      "name": "Supabase Upsert Formula",
+      "credentials": {
+        "supabaseApi": {
+          "id": "uwAmK3QR0J2Wd1go",
+          "name": "Supabase account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Every 10m": {
+      "main": [
+        [
+          {
+            "node": "Supabase Get Leads for Formula",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Get Leads for Formula": {
+      "main": [
+        [
+          {
+            "node": "Code Build Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Build Query": {
+      "main": [
+        [
+          {
+            "node": "Gemini Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Embedding": {
+      "main": [
+        [
+          {
+            "node": "Supabase Match RAG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Match RAG": {
+      "main": [
+        [
+          {
+            "node": "Code Formula",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Formula": {
+      "main": [
+        [
+          {
+            "node": "Supabase Upsert Formula",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "debdba71-1f88-4e55-a3a2-aa09c040d79a",
+  "meta": {
+    "instanceId": "8e66c5449e72620cf9a6b99d81b6bfc7b5a4be1edd8d4a0fe864152e0171afad"
+  },
+  "nodeGroups": [],
+  "id": "WbNb1TX516GqMHLw",
+  "tags": []
+}

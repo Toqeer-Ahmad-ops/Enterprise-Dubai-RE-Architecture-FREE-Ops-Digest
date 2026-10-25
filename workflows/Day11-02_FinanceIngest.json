@@ -1,0 +1,269 @@
+{
+  "name": "Day11-02 Finance RAG Ingest",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "98685c70-e0ff-4503-a35c-5393ebf63259",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        192
+      ],
+      "id": "45f0ad71-df77-400a-9bc8-543bcd8849b7",
+      "name": "Schedule Every 5m"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://pnafbhfijmaaxsertzof.supabase.co/rest/v1/rpc/get_unembedded_finance_docs",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        96
+      ],
+      "id": "d5d9da98-6da7-44fb-8a72-175cc8262790",
+      "name": "Supabase Get Unembedded",
+      "credentials": {
+        "supabaseApi": {
+          "id": "uwAmK3QR0J2Wd1go",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "18fdae79-d4bd-42d9-93c1-d7332198ab23",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        96
+      ],
+      "id": "3285f07a-0a7a-498b-9514-072de68327db",
+      "name": "IF Has Docs"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Day11-02 FIXED 2.43.5 - No for...of, index loop only\nconst CHUNK_SIZE = 2000;\nconst results = [];\n\n// 2.43.5 compatible get items\nlet inputItems = [];\ntry {\n  if ($input && $input.all) {\n    inputItems = typeof $input.all === 'function' ? $input.all() : $input.all;\n  }\n} catch (e) {}\nif (!inputItems || inputItems.length === 0) {\n  try { inputItems = $items(\"IF Has Docs\", 0, 0) || []; } catch(e) {}\n}\n\nfor (let j = 0; j < inputItems.length; j++) {\n  const doc = inputItems[j].json;\n  if (!doc || !doc.content) continue;\n  let count = 0;\n  for (let i = 0; i < doc.content.length; i += CHUNK_SIZE) {\n    results.push({\n      json: {\n        filename: doc.filename || 'unknown.pdf',\n        content: doc.content.slice(i, i + CHUNK_SIZE),\n        chunk_index: count++,\n        parent_id: doc.id || null\n      }\n    });\n  }\n}\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "cd7df0ac-2e7f-4971-8cfb-4f2bdae5bdcc",
+      "name": "Code Chunk 2k"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"models/gemini-embedding-001\",\n  \"content\": { \"parts\": [{\"text\": {{ JSON.stringify($json.content) }} }] },\n  \"outputDimensionality\": 768\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        896,
+        0
+      ],
+      "id": "35fc39c3-9087-47bb-9141-c6e60a972b15",
+      "name": "Gemini Embedding",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "24HMO98yb3N7ucpr",
+          "name": "Gemini Toqeer Prod"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://pnafbhfijmaaxsertzof.supabase.co/rest/v1/finance_docs",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation,resolution=merge-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ filename: $('Code Chunk 2k').item.json.filename, content: $('Code Chunk 2k').item.json.content, chunk_index: $('Code Chunk 2k').item.json.chunk_index, embedding: $json.embedding.values }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "047d5ee3-4098-45ca-87d6-65787b92b4a8",
+      "name": "Supabase Upsert Embedding",
+      "credentials": {
+        "supabaseApi": {
+          "id": "uwAmK3QR0J2Wd1go",
+          "name": "Supabase account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Every 5m": {
+      "main": [
+        [
+          {
+            "node": "Supabase Get Unembedded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Supabase Get Unembedded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Get Unembedded": {
+      "main": [
+        [
+          {
+            "node": "IF Has Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Has Docs": {
+      "main": [
+        [
+          {
+            "node": "Code Chunk 2k",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Chunk 2k": {
+      "main": [
+        [
+          {
+            "node": "Gemini Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Embedding": {
+      "main": [
+        [
+          {
+            "node": "Supabase Upsert Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "b0b875bd-17bc-4d54-9830-e251a7669432",
+  "meta": {
+    "instanceId": "8e66c5449e72620cf9a6b99d81b6bfc7b5a4be1edd8d4a0fe864152e0171afad"
+  },
+  "nodeGroups": [],
+  "id": "y8sflEzFJ5rxaGEz",
+  "tags": []
+}

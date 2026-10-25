@@ -1,0 +1,221 @@
+{
+  "name": "Day10-05 SLA Cron Idempotent",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://pnafbhfijmaaxsertzof.supabase.co/rest/v1/rpc/get_sla_breached_leads",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -208,
+        -176
+      ],
+      "id": "559d8bcc-94ca-4f67-b891-7165ac9c0d5d",
+      "name": "Supabase - Get Breached",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "uwAmK3QR0J2Wd1go",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cb97f55f-1e39-40a8-a28b-7b667402d716",
+              "leftValue": "={{ $json.lead_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        16,
+        -176
+      ],
+      "id": "e68245df-ebf6-41fe-a71f-eb6802cb33d4",
+      "name": "IF - Any Breach?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://pnafbhfijmaaxsertzof.supabase.co/rest/v1/sla_alert_log",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=ignore-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "lead_id",
+              "value": "={{ $json.lead_id }}"
+            },
+            {
+              "name": "alert_type",
+              "value": "sla_breach_1min"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        240,
+        -176
+      ],
+      "id": "9a3379a8-56ca-4d64-ac0f-33451dbaa33d",
+      "name": "Supabase - Log Alert",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "uwAmK3QR0J2Wd1go",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "toqeer.digitizer@gmail.com",
+        "subject": "=🚨 SLA Breach: {{ $('Supabase - Get Breached').item.json.name }} - {{ $('Supabase - Get Breached').item.json.minutes_overdue }}min overdue",
+        "message": "=Lead: {{ $('Supabase - Get Breached').item.json.name }}<br>\nPhone: {{ $('Supabase - Get Breached').item.json.phone }}<br>\nLocation: {{ $('Supabase - Get Breached').item.json.location }}<br>\nOverdue: {{ $('Supabase - Get Breached').item.json.minutes_overdue }}min<br>\nDue: {{ $('Supabase - Get Breached').item.json.follow_up_due_at }}<br>\nID: {{ $('Supabase - Get Breached').item.json.lead_id }}<br><br>\nIdempotent proof: logged in sla_alert_log, won't repeat within 60min.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        464,
+        -176
+      ],
+      "id": "06489e94-0637-4230-a977-0d934756fb12",
+      "name": "Gmail - Alert",
+      "webhookId": "e111eb42-f27b-48e8-ae07-4b900544ddb8",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "u9pNDVz9iDFIuNn0",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "* * * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -432,
+        -176
+      ],
+      "id": "90b41f8d-1c74-43ec-9a02-7b556a0a1fd5",
+      "name": "Cron Every 1 Min"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Supabase - Get Breached": {
+      "main": [
+        [
+          {
+            "node": "IF - Any Breach?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Any Breach?": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Log Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Log Alert": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron Every 1 Min": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Get Breached",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "BCuwiNcb2kepbrXs",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "a3dfd4ad-5008-4849-9682-56d5b0e7bbff",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8e66c5449e72620cf9a6b99d81b6bfc7b5a4be1edd8d4a0fe864152e0171afad"
+  },
+  "nodeGroups": [],
+  "id": "VqDlLKPo5O8Ru2FO",
+  "tags": []
+}

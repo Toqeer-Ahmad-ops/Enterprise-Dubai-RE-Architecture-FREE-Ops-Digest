@@ -1,0 +1,454 @@
+{
+  "name": "Day11-01 FREE Scoring",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -96
+      ],
+      "id": "306c3449-072b-41ad-b580-5d0de69ef0be",
+      "name": "Cron 2min later"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://pnafbhfijmaaxsertzof.supabase.co/rest/v1/rpc/get_unscored_leads",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "select",
+              "value": "*"
+            },
+            {
+              "name": "lead_score",
+              "value": "eq.0"
+            },
+            {
+              "name": "order",
+              "value": "created_at.desc"
+            },
+            {
+              "name": "limit",
+              "value": "5"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "id": "bb092eef-c323-41d7-b864-4640e3ebfb9b",
+      "name": "Get Unscored",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "uwAmK3QR0J2Wd1go",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "576d6085-bb7b-4f48-8b78-112eefb44df6",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        0
+      ],
+      "id": "2456599d-eefe-4e5b-b8a3-9334724e154e",
+      "name": "Any Unscored?"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item = $input.item.json;\nconst msg = ((item.last_message || '') + ' ' + (item.intent || '') + ' ' + (item.source || '')).toLowerCase();\nconst loc = (item.location || '').toLowerCase();\n\nlet score = 30;\nlet reason = 'General inquiry';\n\nif (/urgent|asap|today|now|ready/.test(msg)) { \n  score += 30; \n  reason = 'Urgent intent'; \n}\nif (/buy|cash|invest|budget/.test(msg)) { \n  score += 20; \n  reason += ' + buying intent'; \n}\nif (/marina|palm|downtown|bay|2br|3br/.test(msg + ' ' + loc)) { \n  score += 15; \n  reason += ' + premium location'; \n}\n\nscore = Math.min(score, 95);\n\nreturn {\n  json: {\n    ...item,\n    regex_score: score,\n    regex_reason: reason\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        96
+      ],
+      "id": "d3758a63-e1ab-4a52-b304-d49eb576b165",
+      "name": "Regex Score (FREE engine)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "AQ.Ab8RN6I1Gj0_de8pXLqn2WZWlNYAmNU-QWOKvBDJfOk_J32cwA"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\"parts\": [{\"text\": \"Score 0-100 this Dubai lead: Name={{ $json.name }} Location={{ $json.location }} Source={{ $json.source }} Regex={{ $json.regex_score }}. Return ONLY JSON {\\\"score\\\":80,\\\"reason\\\":\\\"...\\\"}\"}]}]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        896,
+        32
+      ],
+      "id": "060d46aa-0927-4198-8071-94bfc2119b48",
+      "name": "Gemini - Refine",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6b96f692-1b98-4751-a3be-07a92029a1b7",
+              "name": "lead_id",
+              "value": "={{ $('Regex Score (FREE engine)').item.json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "5b03960d-b145-4645-a396-8e4bb75275d0",
+              "name": "score",
+              "value": "={{ $('Regex Score (FREE engine)').item.json.regex_score }}",
+              "type": "string"
+            },
+            {
+              "id": "139f963d-3033-4355-9f32-8a5592243c67",
+              "name": "band",
+              "value": "={{ $('Regex Score (FREE engine)').item.json.regex_score >= 80 ? 'Hot' : $('Regex Score (FREE engine)').item.json.regex_score >= 50 ? 'Warm' : 'Cold' }}",
+              "type": "string"
+            },
+            {
+              "id": "4963e903-ad55-4d6e-8fd8-c34b313eee55",
+              "name": "reason",
+              "value": "={{ $('Regex Score (FREE engine)').item.json.regex_reason }}",
+              "type": "string"
+            },
+            {
+              "id": "d78cdeea-a11f-4bfd-b05b-2eac96b53687",
+              "name": "model",
+              "value": "free-regex-gemini-3.5",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1344,
+        96
+      ],
+      "id": "bd227f90-209f-4123-aaf9-909435416e06",
+      "name": "Set - Band"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://pnafbhfijmaaxsertzof.supabase.co/rest/v1/lead_scores?on_conflict=lead_id",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "return=representation,resolution=merge-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lead_id\": \"{{ $json.lead_id }}\",\n  \"score\": {{ $json.score }},\n  \"band\": \"{{ $json.band }}\",\n  \"reason\": \"{{ $json.reason }}\",\n  \"model\": \"{{ $json.model }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1568,
+        96
+      ],
+      "id": "a76ef9bd-9f30-407b-889a-e237ddae9574",
+      "name": "Supabase - Upsert Score",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "uwAmK3QR0J2Wd1go",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/2 * * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        96
+      ],
+      "id": "13e943a3-9d51-4b9e-9cb6-f02f526fb49f",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "805b6ab0-ae4e-4b23-bb6a-bfd73dd170d6",
+              "leftValue": "={{ JSON.stringify($json.candidates) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1120,
+        96
+      ],
+      "id": "8ddccd91-d5fd-4220-8db4-e24d21249445",
+      "name": "IF - Gemini Failed?"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "day11-lead-trigger-free",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        192
+      ],
+      "id": "6701d465-2735-438e-a0ee-494a3d385688",
+      "name": "Webhook Trigger FREE",
+      "webhookId": "d14f8f77-4b22-4c18-9722-d3f53718949b"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $json.body.lead_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        448,
+        192
+      ],
+      "id": "a73cc748-cd9c-4e11-9921-1e5394374f99",
+      "name": "Get Lead By ID",
+      "credentials": {
+        "supabaseApi": {
+          "id": "uwAmK3QR0J2Wd1go",
+          "name": "Supabase account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cron 2min later": {
+      "main": [
+        [
+          {
+            "node": "Get Unscored",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Unscored": {
+      "main": [
+        [
+          {
+            "node": "Any Unscored?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Unscored?": {
+      "main": [
+        [
+          {
+            "node": "Regex Score (FREE engine)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Regex Score (FREE engine)": {
+      "main": [
+        [
+          {
+            "node": "Gemini - Refine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini - Refine": {
+      "main": [
+        [
+          {
+            "node": "IF - Gemini Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set - Band": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Upsert Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Unscored",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Gemini Failed?": {
+      "main": [
+        [
+          {
+            "node": "Set - Band",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Regex Score (FREE engine)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Trigger FREE": {
+      "main": [
+        [
+          {
+            "node": "Get Lead By ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Lead By ID": {
+      "main": [
+        [
+          {
+            "node": "Regex Score (FREE engine)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "e2bfcc4c-b999-415b-8528-2c9bf9387163",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8e66c5449e72620cf9a6b99d81b6bfc7b5a4be1edd8d4a0fe864152e0171afad"
+  },
+  "nodeGroups": [],
+  "id": "bCxaUdNsEEtxjz95",
+  "tags": []
+}

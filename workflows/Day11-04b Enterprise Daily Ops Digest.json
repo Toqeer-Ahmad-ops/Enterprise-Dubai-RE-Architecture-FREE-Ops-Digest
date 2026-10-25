@@ -1,0 +1,307 @@
+{
+  "name": "Day11-04b Enterprise Daily Ops Digest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "10 9 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -336,
+        -96
+      ],
+      "id": "6c5de5f0-0051-4aaa-9d07-d5014369d88f",
+      "name": "Cron 9:10 AM Dubai"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -336,
+        96
+      ],
+      "id": "22bd423d-2c7b-4c63-a56f-50e3d0027195",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://pnafbhfijmaaxsertzof.supabase.co/rest/v1/rpc/get_daily_digest",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -112,
+        0
+      ],
+      "id": "98b3ad73-7f3a-4cde-8fe1-01338a528e45",
+      "name": "Supabase - Get Digest",
+      "credentials": {
+        "supabaseApi": {
+          "id": "uwAmK3QR0J2Wd1go",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://pnafbhfijmaaxsertzof.supabase.co/rest/v1/rpc/get_top_5_action_leads",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        112,
+        0
+      ],
+      "id": "67ec3fda-635d-4fc5-a8aa-37847e6aaaca",
+      "name": "Supabase - Top 5 Action",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "uwAmK3QR0J2Wd1go",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://pnafbhfijmaaxsertzof.supabase.co/rest/v1/rpc/get_sla_breaches_today",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        336,
+        0
+      ],
+      "id": "ce135b1c-3ff8-47cb-9936-53f0c8e2e331",
+      "name": "Supabase - SLA Today",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "uwAmK3QR0J2Wd1go",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n 2.43.5 SAFE get helper\nfunction getJsons(name){\n  try{\n    const n = $(name);\n    if(n && Array.isArray(n.all)) return n.all.map(i=>i.json||i);\n  }catch(e){}\n  try{\n    const a = $items(name, 0, 0);\n    if(Array.isArray(a)) return a.map(i=>i.json||i);\n  }catch(e){}\n  try{\n    const a2 = $items(name);\n    if(Array.isArray(a2)) return a2.map(i=>i.json||i);\n  }catch(e){}\n  return [];\n}\n\nconst digestRaw = getJsons('Supabase - Get Digest');\nconst digest = digestRaw[0] || {};\n\nconst top5 = getJsons('Supabase - Top 5 Action');\nconst sla = getJsons('Supabase - SLA Today');\n\nconst today = new Date().toLocaleDateString('en-AE', { timeZone: 'Asia/Dubai' });\n\nconst leadsToday = digest.leads_today ?? digest.total_today ?? 1;\nconst hotToday = digest.hot_today ?? digest.hot_count ?? top5.filter(t=>t.band==='Hot').length;\nconst warmToday = digest.warm_today ?? 0;\nconst coldToday = digest.cold_today ?? 0;\nconst breachesToday = digest.sla_breaches_today ?? digest.sla_count ?? sla.length;\n\nlet top5Rows = top5.length ? top5.map(t=>`\n<tr>\n<td style=\"padding:8px;border:1px solid #ddd\">${t.name}</td>\n<td style=\"padding:8px;border:1px solid #ddd\">${t.phone}</td>\n<td style=\"padding:8px;border:1px solid #ddd\">${t.location || '-'}</td>\n<td style=\"padding:8px;border:1px solid #ddd\"><b>${t.band} ${t.score}</b></td>\n<td style=\"padding:8px;border:1px solid #ddd\">${t.reason || t.intent || ''}</td>\n</tr>`).join('') : `<tr><td colspan=\"5\" style=\"padding:12px;text-align:center;color:#888\">No Hot leads today — queue cleared ✅</td></tr>`;\n\nlet slaRows = sla.length ? sla.map(s=>`\n<tr style=\"background:#ffecec\">\n<td style=\"padding:8px;border:1px solid #ddd\">${s.name}</td>\n<td style=\"padding:8px;border:1px solid #ddd\">${s.phone}</td>\n<td style=\"padding:8px;border:1px solid #ddd\">${s.minutes_overdue ?? '-'} min</td>\n<td style=\"padding:8px;border:1px solid #ddd\">${s.follow_up_due_at || s.sent_at || ''}</td>\n</tr>`).join('') : `<tr><td colspan=\"4\" style=\"padding:12px;text-align:center;color:green\">✅ No SLA breach today</td></tr>`;\n\nconst html = `\n<h2 style=\"font-family:Arial\">📊 Dubai Ops Digest - ${today}</h2>\n<table style=\"border-collapse:collapse;width:100%;font-family:Arial;margin-bottom:16px\">\n<tr style=\"background:#f3f4f6\"><td style=\"padding:8px;border:1px solid #ddd\">Leads Today</td><td style=\"padding:8px;border:1px solid #ddd\"><b>${leadsToday}</b></td></tr>\n<tr><td style=\"padding:8px;border:1px solid #ddd\">Hot 🔥</td><td style=\"padding:8px;border:1px solid #ddd\"><b>${hotToday}</b></td></tr>\n<tr style=\"background:#f3f4f6\"><td style=\"padding:8px;border:1px solid #ddd\">Warm</td><td style=\"padding:8px;border:1px solid #ddd\">${warmToday}</td></tr>\n<tr><td style=\"padding:8px;border:1px solid #ddd\">Cold</td><td style=\"padding:8px;border:1px solid #ddd\">${coldToday}</td></tr>\n<tr style=\"background:#ffeaea\"><td style=\"padding:8px;border:1px solid #ddd\">SLA Breaches Today</td><td style=\"padding:8px;border:1px solid #ddd\"><b>${breachesToday}</b></td></tr>\n</table>\n\n<h3>🔥 Top 5 Action Leads (Call NOW)</h3>\n<table style=\"border-collapse:collapse;width:100%;font-family:Arial\">\n<tr style=\"background:#111;color:#fff\"><th style=\"padding:8px\">Name</th><th>Phone</th><th>Location</th><th>Score</th><th>Reason</th></tr>\n${top5Rows}\n</table>\n\n<h3 style=\"margin-top:20px\">🚨 SLA Breaches Today</h3>\n<table style=\"border-collapse:collapse;width:100%;font-family:Arial\">\n<tr style=\"background:#111;color:#fff\"><th style=\"padding:8px\">Name</th><th>Phone</th><th>Overdue</th><th>Due At</th></tr>\n${slaRows}\n</table>\n<p style=\"font-family:Arial;color:#666;font-size:12px;margin-top:20px\">FREE stack: n8n 2.43.5 + Supabase RPC + Gmail + Gemini 3.5-flash-lite • ${today} Asia/Dubai</p>\n`;\n\nreturn [{ json: { html, top5_count: top5.length, sla_count: sla.length, today } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        0
+      ],
+      "id": "9d3ad4ea-47f1-4049-901c-7a09ca668e9b",
+      "name": "Code - Build HTML Enterprise"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "379f934b-52dd-496f-aabf-30cebece46d6",
+              "leftValue": "={{ $json.top5_count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        784,
+        0
+      ],
+      "id": "6da33ccd-b336-4f1d-ae29-fe7b431c5918",
+      "name": "IF - Has Action?"
+    },
+    {
+      "parameters": {
+        "sendTo": "toqeer.digitizer@gmail.com",
+        "subject": "={{ \"🔥 \" + $json.top5_count + \" Hot Leads to Call Today - \" + $json.today }}",
+        "message": "={{ $json.html }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1008,
+        -96
+      ],
+      "id": "dec609ad-5d1e-4f1e-8745-37769373508f",
+      "name": "Gmail - Action Day",
+      "webhookId": "5e451b32-e87c-44e6-9492-0af315a0c7e9",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "u9pNDVz9iDFIuNn0",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "toqeer.digitizer@gmail.com",
+        "subject": "✅ No Hot Leads - Great job!",
+        "message": "={{ $json.html }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1008,
+        96
+      ],
+      "id": "ad37ee1d-1aee-4030-9087-9ce64f781964",
+      "name": "Gmail - No Action Day",
+      "webhookId": "75ac8b70-0b3e-4042-9a9d-79549f514205",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "u9pNDVz9iDFIuNn0",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cron 9:10 AM Dubai": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Get Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Get Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Get Digest": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Top 5 Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Top 5 Action": {
+      "main": [
+        [
+          {
+            "node": "Supabase - SLA Today",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - SLA Today": {
+      "main": [
+        [
+          {
+            "node": "Code - Build HTML Enterprise",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Build HTML Enterprise": {
+      "main": [
+        [
+          {
+            "node": "IF - Has Action?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Has Action?": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Action Day",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gmail - No Action Day",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "c53f521b-57a0-4ff0-916d-0517159e5cce",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8e66c5449e72620cf9a6b99d81b6bfc7b5a4be1edd8d4a0fe864152e0171afad"
+  },
+  "nodeGroups": [],
+  "id": "KYgxEaP21tVbBuHx",
+  "tags": []
+}

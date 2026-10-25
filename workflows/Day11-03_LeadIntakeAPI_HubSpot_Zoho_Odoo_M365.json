@@ -1,0 +1,188 @@
+{
+  "name": "Day11-03_LeadIntakeAPI_HubSpot_Zoho_Odoo_M365",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "v1/leads",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        -80,
+        0
+      ],
+      "id": "122cba6f-670a-4bfd-9096-245382b3741d",
+      "name": "Webhook Intake",
+      "webhookId": "f00a20a5-fa32-406c-9003-9557584701fc"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// FREE - matches your real leads table\nconst body = $input.item.json.body || $input.item.json;\nconst headers = $input.item.json.headers || {};\n\nconst EXPECTED = 'dxb_prod_toqeer_2026_free';\nconst incoming = headers['x-api-key'] || headers['X-Api-Key'] || '';\n\nif (incoming && incoming !== EXPECTED) {\n  throw new Error('Invalid x-api-key');\n}\n\nfunction cleanPhone(p){ return (p||'').replace(/[^+0-9]/g,'').slice(0,20); }\nconst phoneClean = cleanPhone(body.phone);\n\nreturn {\n  json: {\n    name: (body.full_name || body.name || '').trim(),\n    phone: phoneClean,\n    email: (body.email || '').toLowerCase().trim(),\n    budget_max: body.budget_max ? Number(body.budget_max) : null,\n    location: (body.location || '').trim(),\n    intent: (body.purpose || body.intent || body.purpose || '').trim().toLowerCase(), // purpose -> intent\n    timeline: (body.timeline || '').trim(),\n    last_message: (body.message || body.last_message || '').trim(),\n    source: body.source || 'IntakeAPI',\n    status: 'new',\n    qualification_status: 'new',\n    idempotency_key: phoneClean + '_' + Date.now(), // avoids unique clash\n    lead_score: 0\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        144,
+        0
+      ],
+      "id": "c7354d16-d56e-43e8-8d68-19de73bf8563",
+      "name": "Code Normalize Enterprise"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://pnafbhfijmaaxsertzof.supabase.co/rest/v1/leads?on_conflict=phone",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "return=representation,resolution=merge-duplicates"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        368,
+        0
+      ],
+      "id": "93309540-31dd-4428-89e2-b6f28faf9f91",
+      "name": "Supabase Insert Lead",
+      "credentials": {
+        "supabaseApi": {
+          "id": "uwAmK3QR0J2Wd1go",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://rematch-extent-geology.ngrok-free.dev/webhook/day11-lead-trigger-free",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "ngrok-skip-browser-warning",
+              "value": "true"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lead_id\": \"{{ $json.id }}\",\n  \"phone\": \"{{ $json.phone }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        592,
+        0
+      ],
+      "id": "158c6384-c520-4372-98a4-76046894b454",
+      "name": "Trigger Scoring FREE",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, lead_id: $json.id, message: 'Lead ingested, scoring triggered' } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        816,
+        0
+      ],
+      "id": "10cfaee4-a89c-4dec-b11a-73b0e4561e53",
+      "name": "Respond"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Intake": {
+      "main": [
+        [
+          {
+            "node": "Code Normalize Enterprise",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Normalize Enterprise": {
+      "main": [
+        [
+          {
+            "node": "Supabase Insert Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Insert Lead": {
+      "main": [
+        [
+          {
+            "node": "Trigger Scoring FREE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Scoring FREE": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "BCuwiNcb2kepbrXs",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "47719010-3d35-48bf-90a9-fefa79ff7a0f",
+  "meta": {
+    "instanceId": "8e66c5449e72620cf9a6b99d81b6bfc7b5a4be1edd8d4a0fe864152e0171afad"
+  },
+  "nodeGroups": [],
+  "id": "E7xI5Fzljp4SvqEA",
+  "tags": []
+}
