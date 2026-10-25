@@ -42,65 +42,51 @@ Production-grade Dubai RE Lead Automation — IntakeAPI → FREE Scoring (No Pro
 
 ```mermaid
 flowchart TD
+    subgraph INGEST ["Phase 1: Intake & Scoring Engine"]
+        A[Lead Sources Hubspot / Zoho / M365 / Postman] --> B[IntakeAPI Webhook Raw Body OFF]
+        B --> C[Supabase leads idempotency phone]
+        C --> D[Trigger Scoring FREE Day 11]
+        D --> E[Day11-01 Scoring Engine Webhook + Cron 2m]
+        E --> F[Get Unscored Leads]
+        F --> G[Regex Rule-Engine]
+        G --> H[Gemini Refine Band HOT]
+        H --> I[Supabase lead_scores Upsert lead_id]
+    end
 
-%% ===== Phase 1: Intake & FREE Scoring =====
-subgraph INGEST ["Phase 1: Intake & Scoring Engine"]
-  direction TB
-  A[Lead Sources<br/>【entity-HubSpot¦canonical_name=HubSpot】 / 【entity-Zoho¦canonical_name=Zoho】 / M365 / Postman]
-  --> B[IntakeAPI Webhook<br/>POST v1/leads<br/>Raw Body OFF]
-  --> C[(Supabase leads<br/>insert<br/>on_conflict=phone<br/>idempotency_key)]
-  --> D[Trigger Scoring FREE<br/>day11-lead-trigger-free<br/>ngrok-skip-browser-warning]
-  --> E[Day11-01 FREE Scoring<br/>Webhook + Cron 2m]
-  --> F[Get Unscored Leads]
-  --> G[Regex Rule-Engine]
-  --> H[Gemini Refine<br/>Band HOT]
-  --> I[(Supabase lead_scores<br/>Upsert lead_id]
-end
+    subgraph RAG ["Phase 2: CBUAE Finance RAG Pipeline"]
+        J[Day11-02 CBUAE PDF Chunk Size 2k] --> K[Gemini Embeddings 768-dim]
+        K --> L[Supabase finance_docs pgvector - 7 chunks]
+        L --> M[RPC match_finance_docs]
+    end
 
-%% ===== Phase 2: Finance RAG =====
-subgraph RAG ["Phase 2: CB UAE Finance RAG Pipeline"]
-  direction TB
-  J[Day11-02 CB UAE PDF<br/>Chunk Size 2k] --> K[Gemini Embeddings<br/>768-dim]
-  K --> L[Supabase finance_docs<br/>pgvector - 7 chunks]
-  L --> M[RPC match_finance_docs]
-end
+    subgraph DIGEST ["Phase 3: Daily Ops Digest 09:10 GST"]
+        H --> N[Day11-05 Formula Engine relevance x 0.6 + confidence x 0.4]
+        M --> N
+        N --> O[Day11-04b Cron Digest 09:10 AM GST]
+        O --> P[RPC get_daily_ops_metrics]
+        O --> Q[RPC get_top_action_leads]
+        O --> R[RPC get_sla_breached_leads]
+        P & Q & R --> S[Build Enterprise HTML]
+        S --> T{Leads Available?}
+        T -->|Yes| U[Dispatch Gmail Digest 5 Hot Leads]
+        T -->|No| UN[Skip Silent]
+    end
 
-%% ===== Phase 3: Daily Ops Digest =====
-subgraph DIGEST ["Phase 3: Daily Ops Digest 09:10 GST"]
-  direction TB
-  N[Day11-05 Formula Score<br/>relevance * 0.6 + confidence * 0.4]
-  --> O[Day11-04b Digest<br/>09:10 AM GST]
-  O --> P[RPC get_daily_ops_metrics]
-  O --> Q[RPC get_top_action_leads]
-  O --> R[RPC get_sla_breached_leads]
-  P & Q & R --> S[Build Enterprise HTML]
-  S --> T{Leads Available?}
-  T -->|Yes| U[Dispatch Gmail Digest<br/>5 Hot Leads]
-  T -->|No| V[Skip Silent]
-end
+    subgraph SLA ["Phase 4: SLA Monitor & Idempotency"]
+        V[Day10-05 SLA Cron Every 1 Minute] --> W[Get Breached Leads]
+        W --> X{SLA Breached?}
+        X -->|Yes| Y[Log sla_alert_log UNIQUE per hour]
+        Y --> Z[Dispatch Gmail SLA Alert]
+        X -->|No| AA[Healthy Bypass 0 Spam]
+    end
 
-%% ===== Phase 4: SLA =====
-subgraph SLA ["Phase 4: SLA Monitor & Idempotency"]
-  direction TB
-  W[Day10-05 SLA Cron<br/>Every 1 Minute] --> X[Get Breached Leads]
-  X --> Y{SLA Breached?}
-  Y -->|Yes| Z[Log sla_alert_log<br/>UNIQUE per hour]
-  Z --> AA[Dispatch Gmail SLA Alert]
-  Y -->|No| AB[Healthy Bypass<br/>0 Spam]
-end
+    classDef primary fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    classDef success fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ecfdf5;
+    classDef alert fill:#7f1d1d,stroke:#ef4444,stroke-width:2px,color:#fef2f2;
 
-%% Connections
-I --> N
-M --> N
-
-%% Styling
-classDef primary fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#dbeafe;
-classDef success fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#d1fae5;
-classDef alert fill:#7f1d1d,stroke:#f87171,stroke-width:2px,color:#fecaca;
-
-class A,B,D,O,W primary;
-class C,F,I,L,M,P,Q,R success;
-class U,AA,AB alert;
+    class B,D,N,O,V primary;
+    class C,H,L,U success;
+    class Z alert;
 ```
 
 ## 💾 Supabase Persistence Layer – Day 11
